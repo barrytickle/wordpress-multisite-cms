@@ -33,6 +33,14 @@ add_action('acf/init', function () {
         foreach ($field_groups as $group) {
             $block_name = sanitize_title($group['title']);
 
+            // Exclude option pages
+            if (isset($group['location']) && is_array($group['location'])) {
+                $location = $group['location'][0][0]['param'];
+                if(isset($location) && $location === 'options_page') {
+                    continue;
+                }
+            }
+
             acf_register_block_type([
                 'name'              => $block_name,
                 'title'             => $group['title'],

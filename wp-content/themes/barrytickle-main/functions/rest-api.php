@@ -1,5 +1,10 @@
 <?php 
 
+function add_cors_http_header(){
+    header("Access-Control-Allow-Origin: *");
+}
+add_action('init','add_cors_http_header');
+
 
 add_action('rest_api_init', function () {
     register_rest_route('custom/v1', '/all-content(?:/(?P<type>\w+))?', array(
@@ -9,11 +14,58 @@ add_action('rest_api_init', function () {
 });
 
 add_action('rest_api_init', function () {
+    register_rest_route('custom/v1', '/options', array(
+        'methods' => 'GET',
+        'callback' => 'get_acf_options',
+    ));
+});
+
+add_action('rest_api_init', function () {
     register_rest_route('custom/v1', '/content/(?P<id>\d+)', array(
         'methods' => 'GET',
         'callback' => 'get_content_by_id',
     ));
 });
+
+function get_acf_options() {
+    if (!function_exists('acf_get_options_page')) {
+        return new WP_Error('acf_not_found', 'ACF plugin is not active', array('status' => 500));
+    }
+
+    $field_groups = acf_get_field_groups();
+    $options = array();
+
+    foreach ($field_groups as $field_group) {
+        $location = $field_group['location'][0][0]['param'];
+        $slug = $field_group['location'][0][0]['value'];
+
+        if(!isset($location) || !isset($slug)) continue;
+
+        $groups = array();
+        $groups['fields'] = array();
+
+        if ($location === 'options_page') {
+            $camel_case_slug = str_replace(' ', '', ucwords(preg_replace('/[^a-zA-Z0-9]+/', ' ', lcfirst($slug))));
+            $groups['fields'][$camel_case_slug] = get_fields('option');
+        }
+    }
+
+    return $groups;
+}
+
+function process_value($value) {
+    if (is_array($value)) {
+        foreach ($value as &$sub_value) {
+            $sub_value = process_value($sub_value);
+        }
+    } else {
+        $image = wp_get_attachment_image_src($value, 'full');
+        if ($image && isset($image[0])) {
+            $value = $image[0];
+        }
+    }
+    return $value;
+}
 
 function get_content_by_post_id($post_id) {
     $post = get_post($post_id);
@@ -41,20 +93,13 @@ function get_content_by_post_id($post_id) {
                     if(!$field_id) return;
                     $field_type = get_acf_field_type($field_id);
 
-                    if($field_type && $field_type === 'image') {
-                        $image = wp_get_attachment_image_src($value, 'full');
-                        if ($image && $image[0]){
-                            $image = $image[0];
-                        } 
-                        else {
-                            $image = '';
-                        }
-                    }
+                    $value = process_value($value);
+
                     array_push($fields, [
                         'field_name' => $key,
                         'field_id' => $field_id,
                         'field_type' => $field_type,
-                        'field_value' => $field_type === 'image' ? $image : $value,
+                        'field_value' => $value,
                     ]);
                 } 
             }
@@ -64,11 +109,7 @@ function get_content_by_post_id($post_id) {
                 'fields' => $fields,
             ]);
         }
-        $result = array(
-            'id' => $post_id,
-            'title' => get_the_title($post->ID),
-            'blocks' => $acf_data,
-        );
+       $result = $acf_data;
     } else {
         $result = [];
     }
@@ -85,10 +126,9 @@ function get_content_by_id($data) {
 }
 
 function get_all_content($data) {
+    $type = isset($data['type']) ? sanitize_text_field($data['type']) : array('post', 'page');
 
-    $type = isset($data['type']) ? sanitize_text_field($data['type']) : 'post';
-
-    if (!in_array($type, array('post', 'page'))) {
+    if (!is_array($type) && !in_array($type, array('post', 'page'))) {
         return new WP_Error('invalid_type', 'Invalid content type', array('status' => 400));
     }
 
@@ -107,8 +147,11 @@ function get_all_content($data) {
             'title' => get_the_title($post->ID),
             'excerpt' => get_the_excerpt($post->ID),
             'category' => get_the_category($post->ID),
+            'url' => str_replace(home_url(), '', get_permalink($post->ID)),
+            'is_homepage' => (get_option('page_on_front') == $post->ID),
             'tags' => get_the_tags($post->ID),
             'blocks' => get_content_by_post_id($post->ID),
+            'type' => $post->post_type,
         );
     }
 
@@ -120,6 +163,55 @@ function get_acf_field_type($field_key) {
     return $field ? $field['type'] : null;
 }
 
+
+add_action('rest_api_init', function () {
+    register_rest_route('custom/v1', '/menus', array(
+        'methods' => 'GET',
+        'callback' => 'get_all_menus',
+    ));
+});
+
+function get_all_menus() {
+    $menus = wp_get_nav_menus();
+    $result = array();
+
+    foreach ($menus as $menu) {
+        $menu_items = wp_get_nav_menu_items($menu->term_id);
+        $items = array();
+
+        // Create an associative array of items by their ID
+        $items_by_id = array();
+        foreach ($menu_items as $item) {
+            $items_by_id[$item->ID] = array(
+                'id' => $item->ID,
+                'title' => $item->title,
+                'url' => $item->url,
+                'parent' => $item->menu_item_parent,
+                'order' => $item->menu_order,
+                'type' => $item->type,
+                'children' => array(),
+            );
+        }
+
+        // Assign children to their parent items
+        foreach ($items_by_id as &$item) {
+            if ($item['parent']) {
+                $items_by_id[$item['parent']]['children'][] = &$item;
+            } else {
+                $items[] = &$item;
+            }
+        }
+
+        $result[] = array(
+            'id' => $menu->term_id,
+            'name' => $menu->name,
+            'slug' => $menu->slug,
+            'items' => $items,
+        );
+    }
+
+    return $result;
+}
 
 
 
