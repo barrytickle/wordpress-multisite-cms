@@ -185,7 +185,7 @@ function get_all_menus() {
             $items_by_id[$item->ID] = array(
                 'id' => $item->ID,
                 'title' => $item->title,
-                'url' => $item->url,
+                'url' => preg_replace('#/+#', '/', ($item->menu_item_parent ? str_replace(home_url(), '', $items_by_id[$item->menu_item_parent]['url']) : '') . str_replace(home_url(), '', $item->url)),
                 'parent' => $item->menu_item_parent,
                 'order' => $item->menu_order,
                 'type' => $item->type,
