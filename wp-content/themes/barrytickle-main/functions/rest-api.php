@@ -189,6 +189,7 @@ function get_all_menus() {
                 'parent' => $item->menu_item_parent,
                 'order' => $item->menu_order,
                 'type' => $item->type,
+                'cta' => get_post_meta($item->ID, '_menu_item_cta', true),
                 'children' => array(),
             );
         }
@@ -212,6 +213,34 @@ function get_all_menus() {
 
     return $result;
 }
+
+add_action('wp_nav_menu_item_custom_fields', function($item_id, $item, $depth, $args, $id) {
+    $cta = get_post_meta($item_id, '_menu_item_cta', true);
+    ?>
+    <p class="description description-wide">
+        <label for="edit-menu-item-cta-<?php echo $item_id; ?>">
+            <?php _e('CTA'); ?><br>
+            <select id="edit-menu-item-cta-<?php echo $item_id; ?>" class="widefat edit-menu-item-cta" name="menu-item-cta[<?php echo $item_id; ?>]">
+                <option value="false" <?php selected($cta, 'false'); ?>><?php _e('False'); ?></option>
+                <option value="true" <?php selected($cta, 'true'); ?>><?php _e('True'); ?></option>
+            </select>
+        </label>
+    </p>
+    <?php
+}, 10, 5);
+
+add_action('wp_update_nav_menu_item', function($menu_id, $menu_item_db_id, $args) {
+    if (isset($_POST['menu-item-cta'][$menu_item_db_id])) {
+        update_post_meta($menu_item_db_id, '_menu_item_cta', sanitize_text_field($_POST['menu-item-cta'][$menu_item_db_id]));
+    } else {
+        delete_post_meta($menu_item_db_id, '_menu_item_cta');
+    }
+}, 10, 3);
+
+add_filter('wp_setup_nav_menu_item', function($menu_item) {
+    $menu_item->cta = get_post_meta($menu_item->ID, '_menu_item_cta', true);
+    return $menu_item;
+});
 
 
 
