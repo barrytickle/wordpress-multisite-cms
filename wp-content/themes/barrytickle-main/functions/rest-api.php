@@ -98,22 +98,25 @@ function get_content_by_post_id($post_id) {
     }
 
     $content = get_post_field('post_content', $post_id);
-    $blocks = parse_blocks($content);
-
+    
     $acf_data = array();
 
     if (has_blocks($content)) {
         $blocks = parse_blocks($content);
 
         foreach ($blocks as $block) {
-            if(!isset($block['attrs']['data'])) return;
+            if(!isset($block['attrs']['data'])) continue;
+            if (strpos($block['blockName'], 'acf') === false) continue;
             $fields = [];
             foreach($block['attrs']['data'] as $key => $value) {
 
                 if (strpos($key, '_') !== 0) {
                     $field_id = $block['attrs']['data']['_'.$key];
 
-                    if(!$field_id) return;
+                    if(!$field_id) {
+                        print_r('ERROR');
+                        return;
+                    };
                     $field_type = get_acf_field_type($field_id);
 
                     $value = process_value($value);
@@ -126,7 +129,7 @@ function get_content_by_post_id($post_id) {
                         'field_type' => $field_type,
                         'field_value' => $value,
                     ]);
-                } 
+                }
             }
 
             array_push($acf_data, [
@@ -175,8 +178,8 @@ function get_all_content($data) {
             'url' => str_replace(home_url(), '', get_permalink($post->ID)),
             'is_homepage' => (get_option('page_on_front') == $post->ID),
             'tags' => get_the_tags($post->ID),
-            'blocks' => get_content_by_post_id($post->ID),
             'type' => $post->post_type,
+            'blocks' => get_content_by_post_id($post->ID),
         );
     }
 
