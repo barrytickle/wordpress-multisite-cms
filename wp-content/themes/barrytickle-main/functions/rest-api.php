@@ -114,7 +114,6 @@ function sort_repeater_fields($fields) {
     array_push($new_fields, array(
         'field_name' => 'parsed_repeater',
         'field_value' => $parsed_repeater));
-
     
     return $new_fields;
 }
