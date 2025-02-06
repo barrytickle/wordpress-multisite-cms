@@ -95,12 +95,14 @@ function sort_repeater_fields($fields) {
         // If the field is part of the repeater, parse the field name and add it to the parsed repeater array
         $parts = explode('_', $field['field_name']);
 
-        if(!isset($parsed_repeater[$parts[1]])) $parsed_repeater[$parts[1]] = array();
+        // if(!isset($parsed_repeater[$parts[1]])) $parsed_repeater[$parts[1]] = array();
 
-        array_push($parsed_repeater[$parts[1]], array(
-            'field_name' => $parts[2],
-            'field_value' => $field['field_value']
-        ));
+        $parsed_repeater[$parts[1]][$parts[2]] = $field['field_value'];
+
+        // array_push($parsed_repeater[$parts[1]], array(
+        //     'field_name' => $parts[2],
+        //     'field_value' => $field['field_value']
+        // ));
 
     }
 
