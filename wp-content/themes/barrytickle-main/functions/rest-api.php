@@ -61,10 +61,33 @@ function process_value($value) {
     } else {
         $image = wp_get_attachment_image_src($value, 'full');
         if ($image && isset($image[0])) {
-            $value = $image[0];
+            $value = array(
+                'url' => $image[0],
+                'alt' => get_post_meta($value, '_wp_attachment_image_alt', TRUE),
+            );
         }
     }
     return $value;
+}
+function get_rest_api_url() {
+    return esc_url_raw(rest_url('custom/v1'));
+}
+
+// When you use a page link in wordpress, it will return the full url of the page. This function will remove the base url from the link and return the relative path.
+function parse_link($value){
+    $url = esc_url_raw(rest_url('custom/v1'));
+    $cleaned_url = preg_replace("#wp-json/.*#", "", $url);
+
+    if (strpos($value['url'], $cleaned_url) !== false) {
+        $value['url'] = '/'.str_replace($cleaned_url, '', $value['url']);
+    }
+    
+    $link = array(
+        'url' => $value['url'],
+        'title' => $value['title'],
+        'target' => $value['target'],
+    );
+    return $link;
 }
 
 function get_content_by_post_id($post_id) {
@@ -94,6 +117,8 @@ function get_content_by_post_id($post_id) {
                     $field_type = get_acf_field_type($field_id);
 
                     $value = process_value($value);
+
+                    if($field_type === 'link') $value = parse_link($value);
 
                     array_push($fields, [
                         'field_name' => $key,
@@ -158,6 +183,7 @@ function get_all_content($data) {
     return $result;
 }
 
+
 function get_acf_field_type($field_key) {
     $field = get_field_object($field_key);
     return $field ? $field['type'] : null;
@@ -182,6 +208,7 @@ function get_all_menus() {
         // Create an associative array of items by their ID
         $items_by_id = array();
         foreach ($menu_items as $item) {
+
             $items_by_id[$item->ID] = array(
                 'id' => $item->ID,
                 'title' => $item->title,
