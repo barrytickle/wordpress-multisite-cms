@@ -56,3 +56,107 @@ function checkForRepeater($fields){
 
     return $fields;
 }
+
+
+
+function process_value($value) {
+    if (is_array($value)) {
+        foreach ($value as &$sub_value) {
+            $sub_value = process_value($sub_value);
+        }
+    } else {
+        $image = wp_get_attachment_image_src($value, 'full');
+        if ($image && isset($image[0])) {
+            $value = array(
+                'url' => $image[0],
+                'alt' => get_post_meta($value, '_wp_attachment_image_alt', TRUE),
+            );
+        }
+    }
+    return $value;
+}
+
+function get_rest_api_url() {
+    return esc_url_raw(rest_url('custom/v1'));
+}
+
+// When you use a page link in wordpress, it will return the full url of the page. This function will remove the base url from the link and return the relative path.
+function parse_link($value){
+    $url = esc_url_raw(rest_url('custom/v1'));
+    $cleaned_url = preg_replace("#wp-json/.*#", "", $url);
+
+    if (strpos($value['url'], $cleaned_url) !== false) {
+        $value['url'] = '/'.str_replace($cleaned_url, '', $value['url']);
+
+    }
+    
+    $link = array(
+        'url' => $value['url'],
+        'title' => $value['title'],
+        'target' => $value['target'],
+    );
+    return $link;
+}
+
+function get_content_by_post_id($post_id) {
+    $post = get_post($post_id);
+
+    if (!$post) {
+        return new WP_Error('not_found', 'Post not found', array('status' => 404));
+    }
+
+    $content = get_post_field('post_content', $post_id);
+    
+    $acf_data = array();
+
+    if (has_blocks($content)) {
+        $blocks = parse_blocks($content);
+
+        foreach ($blocks as $block) {
+            if(!isset($block['attrs']['data'])) continue;
+            if (strpos($block['blockName'], 'acf') === false) continue;
+            $fields = [];
+            foreach($block['attrs']['data'] as $key => $value) {
+
+                if (strpos($key, '_') !== 0) {
+                    $field_id = $block['attrs']['data']['_'.$key];
+
+                    if(!$field_id) {
+                        print_r('ERROR');
+                        return;
+                    };
+                    $field_type = get_acf_field_type($field_id);
+
+                    $value = process_value($value);
+
+                    if($field_type === 'link') $value = parse_link($value);
+
+                    array_push($fields, [
+                        'field_name' => $key,
+                        'field_id' => $field_id,
+                        'field_type' => $field_type,
+                        'field_value' => $value,
+                    ]);
+                }
+            }
+
+            $fields = checkForRepeater($fields);
+
+            array_push($acf_data, [
+                'block_name' => $block['blockName'],
+                'fields' => $fields,
+            ]);
+        }
+       $result = $acf_data;
+    } else {
+        $result = [];
+    }
+    return $result;
+}
+
+
+function get_acf_field_type($field_key) {
+    $field = get_field_object($field_key);
+    return $field ? $field['type'] : null;
+}
+
