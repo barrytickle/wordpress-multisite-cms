@@ -13,3 +13,7 @@ This is a multisite headless WordPress setup. It allows you to manage multiple W
 - **REST API**: Leverage the WordPress REST API to fetch content and deliver it to your frontend application.
 
 For more details, please visit the [GitHub repository](https://github.com/barrytickle/wordpress-multisite-cms).
+
+## Wordpress Frontend
+
+This is designed to work with a react frontend, an example of one can be located here: https://github.com/barrytickle/portfolio-react-wordpres
