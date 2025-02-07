@@ -12,19 +12,23 @@ function get_acf_options() {
     }
 
     $field_groups = acf_get_field_groups();
+    $groups = array();
+    $groups['fields'] = array();
+
 
     foreach ($field_groups as $field_group) {
         $location = $field_group['location'][0][0]['param'];
         $slug = $field_group['location'][0][0]['value'];
-
         if(!isset($location) || !isset($slug)) continue;
-
-        $groups = array();
-        $groups['fields'] = array();
 
         if ($location === 'options_page') {
             $camel_case_slug = str_replace(' ', '', ucwords(preg_replace('/[^a-zA-Z0-9]+/', ' ', lcfirst($slug))));
-            $groups['fields'][$camel_case_slug] = get_fields('option');
+            $fields = acf_get_fields($field_group['ID']);
+            foreach ($fields as $field) {
+                $field_name = $field['name'];
+                $groups['fields'][$camel_case_slug][$field_name] = get_field($field_name, 'option');
+            }
+
         }
     }
 

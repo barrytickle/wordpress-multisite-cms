@@ -56,9 +56,6 @@ function checkForRepeater($fields){
 
     return $fields;
 }
-
-
-
 function process_value($value) {
     if (is_array($value)) {
         foreach ($value as &$sub_value) {
@@ -98,6 +95,92 @@ function parse_link($value){
     return $link;
 }
 
+function parse_custom_field($key, $post_id){
+    print_r('HIT');
+    switch($key){
+        case 'featured_image':
+            $image = get_the_post_thumbnail_url($post_id, 'full');
+            $alt = get_post_meta(get_post_thumbnail_id($post_id), '_wp_attachment_image_alt', TRUE);
+            return [
+                'url' => $image,
+                'alt' => $alt,
+            ];
+        case 'post_excerpt':
+            return get_the_excerpt($post_id);
+        case 'post_title':
+            return get_the_title($post_id);
+        case 'page_title':
+            return get_the_title($post_id);
+        default:
+            return get_field($key, $post_id);
+    }
+}
+
+
+function parse_acf_block($block, $post_id){
+    $fields = [];
+    
+    foreach($block['attrs']['data'] as $key => $value) {
+
+        if (strpos($key, '_') !== 0) {
+            $field_id = $block['attrs']['data']['_'.$key];
+
+            if(!$field_id) {
+                print_r('ERROR');
+                return;
+            };
+            $field_type = get_acf_field_type($field_id);
+
+            if (strpos($field_type, 'acfe_hidden') !== false) {
+                $value = parse_custom_field($key, $post_id);
+            } else {
+                $value = process_value($value);
+            }
+
+            if($field_type === 'link') $value = parse_link($value);
+
+            array_push($fields, [
+                'field_name' => $key,
+                'field_id' => $field_id,
+                'field_type' => $field_type,
+                'field_value' => $value,
+            ]);
+        }
+    }
+
+    $fields = checkForRepeater($fields);
+
+
+    return [
+        'block_name' => $block['blockName'],
+        'fields' => $fields,
+    ];
+}
+
+function parse_core_block($block){
+    $content = preg_replace('/\s+/', ' ', implode('', $block['innerContent']));
+
+    preg_match('/<([a-z1-6]+)(?:\s+[^>]*)?>/i', $content, $matches);
+    $tag_name = $matches[1] ?? '';
+
+
+    if(isset($block['innerBlocks'])){
+        $inner = [];
+        foreach($block['innerBlocks'] as $innerBlock){
+            $inn = parse_core_block($innerBlock);
+            array_push($inner, $inn);
+        }
+    }
+
+    return [
+        'block_name' => $block['blockName'],
+        'raw' => $block['innerHTML'],
+        'tag_name' => $tag_name,
+        'content' => strip_tags($content),
+        'innerBlocks' => isset($inner) ? $inner : null,
+    ];
+}
+
 function get_content_by_post_id($post_id) {
     $post = get_post($post_id);
 
@@ -113,39 +196,17 @@ function get_content_by_post_id($post_id) {
         $blocks = parse_blocks($content);
 
         foreach ($blocks as $block) {
-            if(!isset($block['attrs']['data'])) continue;
-            if (strpos($block['blockName'], 'acf') === false) continue;
-            $fields = [];
-            foreach($block['attrs']['data'] as $key => $value) {
+            if(!isset($block['blockName'])) continue;
 
-                if (strpos($key, '_') !== 0) {
-                    $field_id = $block['attrs']['data']['_'.$key];
-
-                    if(!$field_id) {
-                        print_r('ERROR');
-                        return;
-                    };
-                    $field_type = get_acf_field_type($field_id);
-
-                    $value = process_value($value);
-
-                    if($field_type === 'link') $value = parse_link($value);
-
-                    array_push($fields, [
-                        'field_name' => $key,
-                        'field_id' => $field_id,
-                        'field_type' => $field_type,
-                        'field_value' => $value,
-                    ]);
-                }
+            if (strpos($block['blockName'], 'acf') === 0){
+                $data = parse_acf_block($block, $post_id);
+            } 
+            if(strpos($block['blockName'], 'core') === 0){
+                $data = parse_core_block($block);
             }
 
-            $fields = checkForRepeater($fields);
-
-            array_push($acf_data, [
-                'block_name' => $block['blockName'],
-                'fields' => $fields,
-            ]);
+            array_push($acf_data, $data);
+           
         }
        $result = $acf_data;
     } else {

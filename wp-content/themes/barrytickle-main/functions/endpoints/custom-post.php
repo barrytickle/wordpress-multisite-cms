@@ -1,6 +1,6 @@
 <?php
 add_action('rest_api_init', function () {
-    register_rest_route('custom/v1', '/custom-posts/(?P<slug>\w+)', array(
+    register_rest_route('custom/v1', '/custom-posts/(?P<slug>[a-zA-Z0-9-]+)', array(
         'methods' => 'GET',
         'callback' => 'get_custom_posts_by_slug',
     ));
@@ -30,7 +30,9 @@ function get_custom_posts_by_slug($data) {
         $result[] = array(
             'id' => $post->ID,
             'title' => get_the_title($post->ID),
+            'featured_image' => get_the_post_thumbnail_url($post->ID),
             'excerpt' => get_the_excerpt($post->ID),
+            'content' => apply_filters('the_content', $post->post_content),
             'url' => str_replace(home_url(), '', get_permalink($post->ID)),
             'type' => $post->post_type,
         );

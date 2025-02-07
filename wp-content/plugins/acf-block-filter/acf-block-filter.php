@@ -4,7 +4,9 @@
 Plugin Name: ACF Block Filter
 Description: A plugin to filter ACF field groups based on selected checkboxes.
 Version: 1.0
-Author: Your Name
+Author: Barry Tickle
+Author URI: https://barrytickle.com
+
 */
 
 if (!defined('ABSPATH')) {

@@ -41,3 +41,9 @@ add_filter('wp_setup_nav_menu_item', function($menu_item) {
     $menu_item->cta = get_post_meta($menu_item->ID, '_menu_item_cta', true);
     return $menu_item;
 });
+
+
+add_filter('acf/field_group/categories', function($categories) {
+    $categories['custom'] = __('Custom', 'acf');
+    return $categories;
+});

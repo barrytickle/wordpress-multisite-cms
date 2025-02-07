@@ -7,16 +7,26 @@ add_action('rest_api_init', function () {
 });
 
 function get_all_content($data) {
-    $type = isset($data['type']) ? sanitize_text_field($data['type']) : array('post', 'page');
+    $type = isset($data['type']) ? sanitize_text_field($data['type']) : array('post', 'page', ...get_post_types(array('public' => true), 'names'));
 
-    if (!is_array($type) && !in_array($type, array('post', 'page'))) {
+    if (!is_array($type) && !in_array($type, array('post', 'page', ...get_post_types(array('public' => true), 'names')))) {
         return new WP_Error('invalid_type', 'Invalid content type', array('status' => 400));
     }
 
+    if($type === 'post'){
+        $all_posts = get_post_types(array('public' => true), 'names');
+
+        if (($key = array_search('page', $all_posts)) !== false) {
+            unset($all_posts[$key]);
+        }
+    }
+
+
     $args = array(
-        'post_type' => $type,
+        'post_type' => $type === 'post' ? $all_posts : $type,
         'posts_per_page' => -1
     );
+
 
     $posts = get_posts($args);
 
