@@ -47,3 +47,17 @@ add_filter('acf/field_group/categories', function($categories) {
     $categories['custom'] = __('Custom', 'acf');
     return $categories;
 });
+
+function allow_only_acf_blocks($allowed_blocks, $editor_context) {
+    // Get all registered ACF blocks
+    $acf_blocks = WP_Block_Type_Registry::get_instance()->get_all_registered();
+    
+    // Filter ACF blocks by checking if their name starts with 'acf/'
+    $allowed_acf_blocks = array_filter(array_keys($acf_blocks), function($block_name) {
+        return strpos($block_name, 'acf/') === 0;
+    });
+
+    return $allowed_acf_blocks;
+}
+
+add_filter('allowed_block_types_all', 'allow_only_acf_blocks', 10, 2);
